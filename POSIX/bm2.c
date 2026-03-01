@@ -40,10 +40,15 @@ void lock_memory() {
 }
 
 void set_affinity() {
-  cpu_set_t mask;
-  CPU_ZERO(&mask);
-  CPU_SET(0, &mask);
-  sched_setaffinity(0, sizeof(mask), &mask);
+    /*
+     * This function sets the CPU affinity of the process to a single CPU (CPU 0 in this case).
+     * This is done to reduce variability in scheduling and ensure that the process runs on the same
+     * CPU, which can help in achieving more consistent timing results.
+     */
+    cpu_set_t mask; // Define a CPU set to specify the CPUs on which the process can run
+    CPU_ZERO(&mask); // Initialize the CPU set to be empty
+    CPU_SET(0, &mask); // Add CPU 0 to the set, allowing the process to run only on CPU 0
+    sched_setaffinity(0, sizeof(mask), &mask); // Set the CPU affinity for the current process (PID 0) to the specified CPU set
 }
 
 void benchmark_timer() {
@@ -58,6 +63,7 @@ void benchmark_timer() {
     sev.sigev_signo = SIGRTMIN;
     sev.sigev_value.sival_ptr = &timer_id;
 
+    // Create the timer
     if (timer_create(CLOCK_MONOTONIC, &sev, &timer_id) == -1) {
         perror("timer_create");
         exit(EXIT_FAILURE);
@@ -68,6 +74,7 @@ void benchmark_timer() {
     its.it_value.tv_nsec = NS_PER_MSEC; // 1 ms
     its.it_interval = its.it_value;
 
+    // Start the timer
     if (timer_settime(timer_id, 0, &its, NULL) == -1) {
         perror("timer_settime");
         exit(EXIT_FAILURE);
