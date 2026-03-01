@@ -58,6 +58,7 @@ void benchmark_timer() {
     long long elapsed;
     long long jitter;
 
+    // Set up the signal event for the timer
     struct sigevent sev;
     sev.sigev_notify = SIGEV_SIGNAL;
     sev.sigev_signo = SIGRTMIN;
@@ -69,6 +70,7 @@ void benchmark_timer() {
         exit(EXIT_FAILURE);
     }
 
+    // Configure the timer to fire every 1 ms
     struct itimerspec its;
     its.it_value.tv_sec = 0;
     its.it_value.tv_nsec = NS_PER_MSEC; // 1 ms
@@ -88,24 +90,25 @@ void benchmark_timer() {
 
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (int i = 0; i < ITERATIONS; i++) {
-      // This suspends the process efficiently until the signal arrives
-      int sig;
-      sigwait(&mask, &sig);
-      clock_gettime(CLOCK_MONOTONIC, &end);
+        // This suspends the process efficiently until the signal arrives
+        int sig;
+        sigwait(&mask, &sig); // Wait for the timer signal
+        clock_gettime(CLOCK_MONOTONIC, &end); // Record the time immediately after waking up
 
-      if ((end.tv_nsec - start.tv_nsec) < 0) {
-        elapsed = end.tv_nsec - start.tv_nsec + NS_PER_SEC;
-      } else {
-        elapsed = end.tv_nsec - start.tv_nsec;
-      }
+        // Calculate the elapsed time and jitter
+        if ((end.tv_nsec - start.tv_nsec) < 0) {
+            elapsed = end.tv_nsec - start.tv_nsec + NS_PER_SEC;
+        } else {
+            elapsed = end.tv_nsec - start.tv_nsec;
+        }
 
-      jitter = elapsed - NS_PER_MSEC;
+        jitter = elapsed - NS_PER_MSEC;
 
-      total_jitter += llabs(jitter);
-      if (jitter > max_jitter) max_jitter = jitter;
-      if (jitter < min_jitter) min_jitter = jitter;
-      ar[cnt++] = jitter;
-      start = end;
+        total_jitter += llabs(jitter);
+        if (jitter > max_jitter) max_jitter = jitter;
+        if (jitter < min_jitter) min_jitter = jitter;
+        ar[cnt++] = jitter;
+        start = end; // Update start time for next iteration
     }
 
     for (int j = 0; j < ITERATIONS; j++) printf("%lld\t", ar[j]);
