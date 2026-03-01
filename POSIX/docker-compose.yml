@@ -1,0 +1,23 @@
+services:
+  benchmark:
+    build: .
+    container_name: ct420_benchmark
+    
+    # Single vCPU
+    cpus: "1"
+    
+    # 512MB RAM limit
+    mem_limit: 512m
+    
+    # Allow memory swapping (total = mem + swap, so 1024m here = 512m swap space)
+    memswap_limit: 1024m
+    
+    privileged: true
+    
+    # Keep container running
+    stdin_open: true
+    tty: true
+    
+    volumes:
+      # Mount a local folder for saving CSV output files
+      - ./output:/workspace/output
