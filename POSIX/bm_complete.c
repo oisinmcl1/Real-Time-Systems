@@ -17,7 +17,7 @@
 
 
 // Globals
-volatile sig_atomic_t signal_received = 0;
+// volatile sig_atomic_t signal_received = 0; // I do not believe this is used anymore after sigwait approach
 struct timespec start, end, sleep_time;
 
 timer_t timer_id;
@@ -54,22 +54,21 @@ void set_affinity() {
      * Pin the process to a single CPU (CPU 0).
      * Reduces scheduling variability and helps achieve more consistent timing results.
      */
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
-    CPU_SET(0, &mask);
-    sched_setaffinity(0, sizeof(mask), &mask);
+    cpu_set_t mask; // CPU affinity mask
+    CPU_ZERO(&mask); // Clear the CPU mask
+    CPU_SET(0, &mask); // Set CPU 0 in the mask
+    sched_setaffinity(0, sizeof(mask), &mask); // Set the CPU affinity
 }
 
-// Used by benchmark_signal_latency
-void signal_handler(int signum) {
-    /*
-     * Called when SIGUSR1 is received. Sets the signal_received flag
-     * and records the time at which the signal was handled.
-     */
-    (void)signum;
-    signal_received = 1;
-    clock_gettime(CLOCK_MONOTONIC, &end);
-}
+// This function is no longer used after sigwait approach
+// void signal_handler(int signum) {
+//     /*
+//      * Called when SIGUSR1 is received. Sets the signal_received flag
+//      * and records the time at which the signal was handled.
+//      */
+//     signal_received = 1;
+//     clock_gettime(CLOCK_MONOTONIC, &end); // Record the end time
+// }
 
 
 /* 
@@ -84,10 +83,11 @@ void benchmark_nanosleep() {
     sleep_time.tv_nsec = 1000000; // 1 ms
 
     for (int i = 0; i < ITERATIONS; i++) {
-        clock_gettime(CLOCK_MONOTONIC, &start);
-        nanosleep(&sleep_time, NULL);
-        clock_gettime(CLOCK_MONOTONIC, &end);
+        clock_gettime(CLOCK_MONOTONIC, &start); // Start time
+        nanosleep(&sleep_time, NULL); // Sleep for 1 ms
+        clock_gettime(CLOCK_MONOTONIC, &end); // Record the end time
 
+        // Calculate elapsed time and jitter
         long long elapsed = (end.tv_sec  - start.tv_sec) * NS_PER_SEC + (end.tv_nsec - start.tv_nsec);
         long long jitter  = elapsed - sleep_time.tv_nsec;
 
@@ -111,21 +111,33 @@ void benchmark_signal_latency() {
     long long max_latency   = 0;
     long long min_latency   = LLONG_MAX;
 
-    signal(SIGUSR1, signal_handler);
+    // signal(SIGUSR1, signal_handler); // Set up the signal handler for SIGUSR1
+
+    // Block SIGUSR1
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGUSR1);
+    sigprocmask(SIG_BLOCK, &mask, NULL);
 
     for (int i = 0; i < ITERATIONS; i++) {
-        clock_gettime(CLOCK_MONOTONIC, &start);
-        
-        kill(getpid(), SIGUSR1); // Send SIGUSR1 to trigger the signal handler
-        while (!signal_received); // Spin until the signal has been handled
+        clock_gettime(CLOCK_MONOTONIC, &start); // Start time
 
-        long long latency = (end.tv_sec  - start.tv_sec) * NS_PER_SEC + (end.tv_nsec - start.tv_nsec);
+        kill(getpid(), SIGUSR1); // Send SIGUSR1
+        // while (!signal_received); // Spin until the signal has been handled
+
+        int sig;
+        sigwait(&mask, &sig); // Wait for the signal
         
+        clock_gettime(CLOCK_MONOTONIC, &end); // Record the end time
+
+        // Record the end time and calculate latency
+        long long latency = (end.tv_sec  - start.tv_sec) * NS_PER_SEC + (end.tv_nsec - start.tv_nsec);
+
         total_latency += latency;
         if (latency > max_latency) max_latency = latency;
         if (latency < min_latency) min_latency = latency;
 
-        signal_received = 0;
+        // signal_received = 0; // Reset the signal received flag
     }
 
     printf("\nSignal Latency Benchmark (%d iterations):\n", ITERATIONS);
@@ -180,12 +192,13 @@ void benchmark_timer() {
         sigwait(&mask, &sig); // Wait for the timer signal
         clock_gettime(CLOCK_MONOTONIC, &end); // Get the end time
 
-        // Calculate elapsed time and jitter
-        if ((end.tv_nsec - start.tv_nsec) < 0) {
-            elapsed = end.tv_nsec - start.tv_nsec + NS_PER_SEC;
-        } else {
-            elapsed = end.tv_nsec - start.tv_nsec;
-        }
+        // Calculate elapsed time and jitter - I think orignal approach ignored seconds
+        // if ((end.tv_nsec - start.tv_nsec) < 0) {
+        //     elapsed = end.tv_nsec - start.tv_nsec + NS_PER_SEC;
+        // } else {
+        //     elapsed = end.tv_nsec - start.tv_nsec;
+        // }
+        elapsed = (end.tv_sec - start.tv_sec) * NS_PER_SEC + (end.tv_nsec - start.tv_nsec);
 
         jitter = elapsed - NS_PER_MSEC;
 
