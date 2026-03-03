@@ -24,6 +24,26 @@ timer_t timer_id;
 long long timer_ar[TIMER_ITERATIONS];
 int timer_cnt = 0;
 
+// Benchmark arrays
+long long nanosleep_ar[ITERATIONS];
+long long signal_ar[ITERATIONS];
+
+void write_csv(const char *filename, long long *data, int count) {
+    /*
+     * Writes benchmark data to a CSV file.
+     */
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        perror(filename);
+        return;
+    }
+    fprintf(fp, "iteration,value_ns\n");
+    for (int i = 0; i < count; i++) {
+        fprintf(fp, "%d,%lld\n", i + 1, data[i]); // Write iteration and value
+    }
+    fclose(fp);
+}
+
 // System configuration helpers
 void configure_realtime_scheduling() {
     /*
@@ -94,12 +114,15 @@ void benchmark_nanosleep() {
         total_jitter += llabs(jitter);
         if (jitter > max_jitter) max_jitter = jitter;
         if (jitter < min_jitter) min_jitter = jitter;
+        nanosleep_ar[i] = jitter;
     }
 
     printf("Nanosleep Benchmark (%d iterations):\n", ITERATIONS);
     printf("    Average jitter: %lld ns\n", total_jitter / ITERATIONS);
     printf("    Max jitter: %lld ns\n", max_jitter);
     printf("    Min jitter: %lld ns\n", min_jitter);
+
+    write_csv("./output/nanosleep.csv", nanosleep_ar, ITERATIONS);
 }
 
 
@@ -136,6 +159,7 @@ void benchmark_signal_latency() {
         total_latency += latency;
         if (latency > max_latency) max_latency = latency;
         if (latency < min_latency) min_latency = latency;
+        signal_ar[i] = latency;
 
         // signal_received = 0; // Reset the signal received flag
     }
@@ -144,6 +168,8 @@ void benchmark_signal_latency() {
     printf("    Average latency: %lld ns\n", total_latency / ITERATIONS);
     printf("    Max latency: %lld ns\n", max_latency);
     printf("    Min latency: %lld ns\n", min_latency);
+
+    write_csv("./output/signal.csv", signal_ar, ITERATIONS);
 }
 
 /*
@@ -216,6 +242,8 @@ void benchmark_timer() {
     printf("    Average jitter: %lld ns\n", total_jitter / TIMER_ITERATIONS);
     printf("    Max jitter: %lld ns\n", max_jitter);
     printf("    Min jitter: %lld ns\n", min_jitter);
+
+    write_csv("./output/timer.csv", timer_ar, TIMER_ITERATIONS);
 
     timer_delete(timer_id);
 }
