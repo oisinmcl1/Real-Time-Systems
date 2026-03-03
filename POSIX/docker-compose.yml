@@ -19,5 +19,4 @@ services:
     tty: true
     
     volumes:
-      # Mount a local folder for saving CSV output files
       - ./output:/workspace/output
