@@ -12,6 +12,10 @@ for name, filepath in files.items():
     df = pd.read_csv(filepath)
     values = df["value_ns"]
 
+    # Fix timer values
+    if name == "timer":
+        values = values.abs()
+
     # Print statistics
     print(f"\n{name}")
     print(f"Count: {len(values)}")
